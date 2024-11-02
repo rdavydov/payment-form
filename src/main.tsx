@@ -7,15 +7,15 @@ import App from "./App.tsx";
 
 const router = createBrowserRouter([
   {
-    path: "/",
+    path: "/payment-form/",
     element: <App />,
     children: [
       {
-        path: "/",
+        path: "/payment-form/",
         element: <PaymentForm />,
       },
       {
-        path: "/request-details",
+        path: "/payment-form/request-details",
         element: <RequestDetails />,
       },
     ],
