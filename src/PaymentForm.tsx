@@ -33,6 +33,38 @@ const validateLuhn = (number: string) => {
   return sum % 10 === 0;
 };
 
+// Функция валидации срока действия карты
+const validateExpiryDate = (value: string): boolean => {
+  if (!value) return false;
+
+  const [month, year] = value.split("/").map((part) => parseInt(part, 10));
+  const currentYear = new Date().getFullYear() % 100; // Получаем последние 2 цифры текущего года
+
+  // Проверяем, что месяц в диапазоне 1-12
+  if (!month || month < 1 || month > 12) return false;
+
+  // Проверяем, что год не меньше текущего
+  if (!year || year < currentYear) return false;
+
+  return true;
+};
+
+// Функция форматирования суммы
+const formatAmount = (value: string): string => {
+  // Убираем все нецифровые символы
+  const numbers = value.replace(/\D/g, "");
+  if (!numbers) return "";
+
+  // Форматируем число с разделителями тысяч
+  const formatted = new Intl.NumberFormat("ru-RU").format(parseInt(numbers));
+  return `${formatted} ₽`;
+};
+
+// Функция очистки суммы от форматирования
+const cleanAmount = (value: string): string => {
+  return value.replace(/\D/g, "");
+};
+
 const PaymentForm = () => {
   const navigate = useNavigate();
 
@@ -41,7 +73,7 @@ const PaymentForm = () => {
     cardNumber: "",
     expiryDate: "",
     cvv: "",
-    amount: "",
+    amount: "500 ₽",
     name: "",
     message: "Экскурсия",
   });
@@ -73,11 +105,28 @@ const PaymentForm = () => {
   const maskExpiryDate = (value: string) => {
     const cleaned = value.replace(/\D/g, "");
     const matched = cleaned.match(/(\d{0,2})(\d{0,2})/);
-    return matched
-      ? !matched[2]
-        ? matched[1]
-        : `${matched[1]}/${matched[2]}`
-      : "";
+    const currentYear = new Date().getFullYear() % 100; // Получаем последние 2 цифры текущего года
+
+    if (!matched) return "";
+
+    let month = matched[1];
+    let year = matched[2];
+
+    // Корректируем месяц
+    if (month.length === 1 && parseInt(month) > 1) {
+      month = `0${month}`;
+    } else if (month.length === 2) {
+      const monthNum = parseInt(month);
+      if (monthNum === 0) month = "01";
+      if (monthNum > 12) month = "12";
+    }
+
+    // Корректируем год
+    if (year.length === 2 && parseInt(year) < currentYear) {
+      year = currentYear.toString();
+    }
+
+    return year ? `${month}/${year}` : month;
   };
 
   // Обработчики ввода
@@ -96,7 +145,8 @@ const PaymentForm = () => {
         maskedValue = value.replace(/\D/g, "").slice(0, 3);
         break;
       case "amount":
-        maskedValue = value.replace(/\D/g, "");
+        // Если пользователь стирает значение полностью, оставляем пустую строку
+        maskedValue = value === "" ? "" : formatAmount(value);
         break;
       default:
         break;
@@ -126,15 +176,18 @@ const PaymentForm = () => {
 
     if (!formData.expiryDate) {
       newErrors.expiryDate = "Введите срок";
+    } else if (!validateExpiryDate(formData.expiryDate)) {
+      newErrors.expiryDate = "Неверный срок действия карты";
     }
 
     if (!formData.cvv) {
       newErrors.cvv = "Введите CVV";
     }
 
-    if (!formData.amount) {
+    const cleanedAmount = cleanAmount(formData.amount);
+    if (!cleanedAmount) {
       newErrors.amount = "Введите сумму";
-    } else if (parseInt(formData.amount) < 10) {
+    } else if (parseInt(cleanedAmount) < 10) {
       newErrors.amount = "Минимальная сумма 10 ₽";
     }
 
@@ -157,8 +210,11 @@ const PaymentForm = () => {
     // Создаем ID транзакции
     const transactionId = Date.now().toString();
 
+    // Получаем чистое значение суммы без форматирования
+    const cleanedAmount = cleanAmount(formData.amount);
+
     // Создаем хеш-сумму
-    const dataToHash = `${API_KEY}${transactionId}${formData.amount}${SECRET}`;
+    const dataToHash = `${API_KEY}${transactionId}${cleanedAmount}${SECRET}`;
     const hashSum = await crypto.subtle
       .digest("SHA-256", new TextEncoder().encode(dataToHash))
       .then((hash) =>
@@ -173,7 +229,7 @@ const PaymentForm = () => {
       transaction: transactionId,
       description: formData.message,
       apikey: API_KEY,
-      amount: parseInt(formData.amount),
+      amount: parseInt(cleanedAmount),
       custom_data: {
         initiator: "Иван К.",
         event: "Экскурсия",
@@ -216,6 +272,7 @@ const PaymentForm = () => {
                 name="expiryDate"
                 value={formData.expiryDate}
                 onChange={handleInputChange}
+                placeholder="ММ/ГГ"
                 className={errors.expiryDate ? "border-red-500" : ""}
               />
               {errors.expiryDate && (
@@ -248,6 +305,7 @@ const PaymentForm = () => {
               name="amount"
               value={formData.amount}
               onChange={handleInputChange}
+              placeholder="₽"
               className={errors.amount ? "border-red-500" : ""}
             />
             {errors.amount && (
@@ -289,7 +347,6 @@ const PaymentForm = () => {
               type="button"
               variant="secondary"
               size={"lg"}
-              // className="flex-3"
               onClick={() => window.history.back()}
             >
               Вернуться
