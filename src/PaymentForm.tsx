@@ -181,7 +181,7 @@ const PaymentForm = () => {
     };
 
     // Перенаправляем на страницу с данными запроса
-    navigate("/request-details", { state: { requestBody } });
+    navigate("./request-details", { state: { requestBody } });
   };
 
   return (
