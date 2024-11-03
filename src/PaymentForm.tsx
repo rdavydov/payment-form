@@ -57,7 +57,7 @@ const formatAmount = (value: string): string => {
 
   // Форматируем число с разделителями тысяч
   const formatted = new Intl.NumberFormat("ru-RU").format(parseInt(numbers));
-  return `${formatted} ₽`;
+  return formatted;
 };
 
 // Функция очистки суммы от форматирования
@@ -129,6 +129,30 @@ const PaymentForm = () => {
     return year ? `${month}/${year}` : month;
   };
 
+  // Обработчики фокуса ввода суммы
+  const handleAmountFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    if (value) {
+      // Удаляем символ рубля при получении фокуса
+      const cleanValue = value.replace(/₽/g, "").trim();
+      setFormData((prev) => ({
+        ...prev,
+        amount: cleanValue,
+      }));
+    }
+  };
+
+  const handleAmountBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    if (value) {
+      const cleanValue = value.replace(/₽/g, "").trim();
+      setFormData((prev) => ({
+        ...prev,
+        amount: `${cleanValue} ₽`.trim(),
+      }));
+    }
+  };
+
   // Обработчики ввода
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -145,8 +169,9 @@ const PaymentForm = () => {
         maskedValue = value.replace(/\D/g, "").slice(0, 3);
         break;
       case "amount":
-        // Если пользователь стирает значение полностью, оставляем пустую строку
-        maskedValue = value === "" ? "" : formatAmount(value);
+        // Удаляем символ рубля и пробелы перед форматированием
+        maskedValue =
+          value === "" ? "" : formatAmount(value.replace(/[₽\s]/g, ""));
         break;
       default:
         break;
@@ -305,6 +330,8 @@ const PaymentForm = () => {
               name="amount"
               value={formData.amount}
               onChange={handleInputChange}
+              onBlur={handleAmountBlur}
+              onFocus={handleAmountFocus}
               placeholder="₽"
               className={errors.amount ? "border-red-500" : ""}
             />
